@@ -115,4 +115,4 @@ if __name__ == "__main__":
     success = create_cloudflare_dns_record(subdomain, target, record_type)
 
     if not success:
-        sys.exit(1) # Indicate failure to GitHub Actions
+        sys.exit(1) # Indicate failure to GitHub Actions , Report if gives error.
