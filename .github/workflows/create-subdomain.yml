@@ -1,21 +1,21 @@
-name: Create Subdomain DNS Record
+name: Create Subdomain DNS Record on Cloudflare
 
 on:
   pull_request:
-    types: [closed]
+    types: [closed] # Trigger when a pull request is closed
     branches:
-      - main # Or your default branch (e.g., 'master')
+      - main # Only run if the PR was merged into the 'main' branch
 
 jobs:
   create-dns:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true # Only run if the PR was actually merged, not just closed
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # Fetch the full history to ensure git diff-tree can work correctly
         with:
+          # Fetch the full history to ensure git commands (like diff-tree) work correctly
           fetch-depth: 0
 
       - name: Set up Python
@@ -23,27 +23,31 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install requests
 
-      - name: Get merged file path
+      - name: Get Merged JSON File Path
         id: get_file_path
         run: |
-          # Get the SHA of the merge commit
+          # --- This is the most robust way to find the ADDED file in a MERGED PR ---
           MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
           if [ -z "$MERGE_COMMIT_SHA" ]; then
-            echo "::error::Could not find merge commit SHA."
+            echo "::error::Could not find merge commit SHA. This might happen if the PR was not merged in a way that creates a merge commit (e.g., rebase and merge, squash and merge, or if the event payload is incomplete)."
             exit 1
           fi
 
-          # Use git diff-tree to find added files in the merge commit
+          # Find files that were ADDED (A) in the merge commit that are inside 'domains/'
           # --no-commit-id: Don't show the commit ID
           # --name-only: Show only file names
           # --diff-filter=A: Show only added files
-          NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep 'domains/.*\.json' | head -n 1)
+          # head -n 1: Assumes only one JSON file is added per PR. Adjust if users can add multiple.
+          NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
 
           if [ -z "$NEW_FILE" ]; then
             echo "::error::No new JSON file found in 'domains/' directory for this PR merge."
+            echo "DEBUG: Checked merge commit: $MERGE_COMMIT_SHA"
+            echo "DEBUG: Full diff-tree output:"
+            git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" || true # Show full output for debugging
             exit 1
           fi
           echo "NEW_FILE_PATH=$NEW_FILE" >> $GITHUB_OUTPUT
