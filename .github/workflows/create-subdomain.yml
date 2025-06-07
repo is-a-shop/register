@@ -2,20 +2,20 @@ name: Create Subdomain DNS Record on Cloudflare
 
 on:
   pull_request:
-    types: [closed] # Trigger when a pull request is closed
+    types: [closed]
     branches:
       - main # Only run if the PR was merged into the 'main' branch
 
 jobs:
   create-dns:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true # Only run if the PR was actually merged, not just closed
+    if: github.event.pull_request.merged == true
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Fetch the full history to ensure git commands (like diff-tree) work correctly
+          # Fetch the full history of both head and base for robust diffing
           fetch-depth: 0
 
       - name: Set up Python
@@ -26,30 +26,44 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Get Merged JSON File Path
+      - name: Get Merged JSON File Path (Enhanced Debugging)
         id: get_file_path
         run: |
-          # --- This is the most robust way to find the ADDED file in a MERGED PR ---
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
-          if [ -z "$MERGE_COMMIT_SHA" ]; then
-            echo "::error::Could not find merge commit SHA. This might happen if the PR was not merged in a way that creates a merge commit (e.g., rebase and merge, squash and merge, or if the event payload is incomplete)."
-            exit 1
-          fi
 
-          # Find files that were ADDED (A) in the merge commit that are inside 'domains/'
-          # --no-commit-id: Don't show the commit ID
-          # --name-only: Show only file names
-          # --diff-filter=A: Show only added files
-          # head -n 1: Assumes only one JSON file is added per PR. Adjust if users can add multiple.
-          NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
+          echo "DEBUG: Base SHA: $BASE_SHA"
+          echo "DEBUG: Head SHA: $HEAD_SHA"
+          echo "DEBUG: Merge Commit SHA: $MERGE_COMMIT_SHA"
+
+          NEW_FILE=""
+
+          echo "DEBUG: Attempting to find added JSON file using git diff between base and head SHAs..."
+          # This command compares the state of the base branch before the PR to the head of the PR.
+          # It's often more reliable for finding files added *within* the PR's commits.
+          # --diff-filter=A looks for added files.
+          # We're adding the '^' anchor in grep to ensure it starts with 'domains/'
+          NEW_FILE=$(git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" | grep '^domains/.*\.json$' | head -n 1)
+
+          if [ -z "$NEW_FILE" ]; then
+            echo "DEBUG: No file found with git diff between base and head. Attempting fallback with merge commit..."
+            # Fallback to git diff-tree on the merge commit itself
+            if [ -n "$MERGE_COMMIT_SHA" ]; then
+                NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
+            fi
+          fi
 
           if [ -z "$NEW_FILE" ]; then
             echo "::error::No new JSON file found in 'domains/' directory for this PR merge."
-            echo "DEBUG: Checked merge commit: $MERGE_COMMIT_SHA"
-            echo "DEBUG: Full diff-tree output:"
-            git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" || true # Show full output for debugging
+            echo "DEBUG: Checked with git diff ($BASE_SHA..$HEAD_SHA) and git diff-tree ($MERGE_COMMIT_SHA)."
+            echo "DEBUG: --- Full `git diff --name-only --diff-filter=A $BASE_SHA $HEAD_SHA` output for debugging: ---"
+            git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" || true # Display raw output for debugging
+            echo "DEBUG: --- Full `git diff-tree --no-commit-id --name-only --diff-filter=A $MERGE_COMMIT_SHA` output for debugging: ---"
+            git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" || true # Display raw output for debugging
             exit 1
           fi
+
           echo "NEW_FILE_PATH=$NEW_FILE" >> $GITHUB_OUTPUT
           echo "Discovered new file: $NEW_FILE"
 
