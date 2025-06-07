@@ -2,18 +2,21 @@ name: Create Subdomain DNS Record
 
 on:
   pull_request:
-    types: [closed] # Trigger when a pull request is closed
+    types: [closed]
     branches:
       - main # Or your default branch (e.g., 'master')
 
 jobs:
   create-dns:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true # Only run if the PR was merged, not just closed
+    if: github.event.pull_request.merged == true
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        # Fetch the full history to ensure git diff-tree can work correctly
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,21 +27,23 @@ jobs:
         run: pip install requests
 
       - name: Get merged file path
-        # This step figures out which JSON file was merged.
-        # It's a bit tricky to get *only* the merged file path reliably in GitHub Actions.
-        # A simpler approach for *this specific use case* might be to assume the PR
-        # only contains one JSON file addition.
-        # For more robust solutions, consider:
-        # - Looping through changes to find added files
-        # - Having a specific naming convention
-        # For now, let's assume one file added, and it's named like the subdomain.
         id: get_file_path
         run: |
-          # This assumes a clean merge with only one new JSON file added to 'domains/'
-          # You might need to refine this for complex PRs.
-          NEW_FILE=$(git diff --name-only ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.base.sha }} | grep 'domains/.*\.json' | head -n 1)
+          # Get the SHA of the merge commit
+          MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          if [ -z "$MERGE_COMMIT_SHA" ]; then
+            echo "::error::Could not find merge commit SHA."
+            exit 1
+          fi
+
+          # Use git diff-tree to find added files in the merge commit
+          # --no-commit-id: Don't show the commit ID
+          # --name-only: Show only file names
+          # --diff-filter=A: Show only added files
+          NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep 'domains/.*\.json' | head -n 1)
+
           if [ -z "$NEW_FILE" ]; then
-            echo "::error::No new JSON file found in 'domains/' directory for this PR."
+            echo "::error::No new JSON file found in 'domains/' directory for this PR merge."
             exit 1
           fi
           echo "NEW_FILE_PATH=$NEW_FILE" >> $GITHUB_OUTPUT
@@ -47,5 +52,5 @@ jobs:
       - name: Run DNS creation script
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }} # You need to set this in GitHub Secrets too!
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: python scripts/add_dns_record.py ${{ steps.get_file_path.outputs.NEW_FILE_PATH }}
