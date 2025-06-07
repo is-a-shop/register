@@ -1,5 +1,5 @@
 {
-    "subdomain": "testing2",
+    "subdomain": "testing3",
     "target": "example2.com",
     "record_type": "CNAME",
     "description": "A test subdomain.",
