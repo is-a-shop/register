@@ -1,0 +1,10 @@
+{
+  "subdomain": "domains",
+  "target": "harys722.github.io",
+  "record_type": "CNAME",
+  "description": "A curated collection of free subdomains ideal for personal websites, open-source projects, portfolio showcases, and innovative online ventures.",
+  "owner": {
+    "github_username": "harys722",
+    "email": "contact@harys.is-a.dev"
+  }
+}
