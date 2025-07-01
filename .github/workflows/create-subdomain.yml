@@ -1,21 +1,28 @@
 name: Create Subdomain DNS Record on Cloudflare
 
+# === The Fix ===
+# Changed from `pull_request` to `pull_request_target`.
+# This allows the workflow to access secrets even when the PR is from a fork,
+# because it runs in the context of the base repository (your repository).
+# The job is still protected by the `if` condition to only run after a successful merge.
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
     branches:
       - main # Only run if the PR was merged into the 'main' branch
 
 jobs:
   create-dns:
-    runs-on: ubuntu-latest
+    # This condition is crucial. It ensures the job only runs after a maintainer
+    # has reviewed and merged the code, making the use of pull_request_target safe.
     if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Fetch the full history of both head and base for robust diffing
+          # Fetch the full history. This is important for the git diff commands below.
           fetch-depth: 0
 
       - name: Set up Python
@@ -26,41 +33,30 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Get Merged JSON File Path (Enhanced Debugging)
+      - name: Get Merged JSON File Path
         id: get_file_path
         run: |
+          # These SHAs are provided by the pull_request_target context
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
 
-          echo "DEBUG: Base SHA: $BASE_SHA"
-          echo "DEBUG: Head SHA: $HEAD_SHA"
-          echo "DEBUG: Merge Commit SHA: $MERGE_COMMIT_SHA"
+          echo "Base SHA: $BASE_SHA"
+          echo "Head SHA: $HEAD_SHA"
+          echo "Merge Commit SHA: $MERGE_COMMIT_SHA"
 
-          NEW_FILE=""
-
-          echo "DEBUG: Attempting to find added JSON file using git diff between base and head SHAs..."
-          # This command compares the state of the base branch before the PR to the head of the PR.
-          # It's often more reliable for finding files added *within* the PR's commits.
-          # --diff-filter=A looks for added files.
-          # We're adding the '^' anchor in grep to ensure it starts with 'domains/'
+          # This logic robustly finds the new JSON file added in the pull request.
+          # It first checks the difference between the PR's head and its base.
           NEW_FILE=$(git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" | grep '^domains/.*\.json$' | head -n 1)
 
+          # As a fallback, it checks the files changed in the merge commit itself.
           if [ -z "$NEW_FILE" ]; then
-            echo "DEBUG: No file found with git diff between base and head. Attempting fallback with merge commit..."
-            # Fallback to git diff-tree on the merge commit itself
-            if [ -n "$MERGE_COMMIT_SHA" ]; then
-                NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
-            fi
+            echo "No file found with primary method. Using fallback with merge commit SHA..."
+            NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
           fi
 
           if [ -z "$NEW_FILE" ]; then
             echo "::error::No new JSON file found in 'domains/' directory for this PR merge."
-            echo "DEBUG: Checked with git diff ($BASE_SHA..$HEAD_SHA) and git diff-tree ($MERGE_COMMIT_SHA)."
-            echo "DEBUG: --- Full `git diff --name-only --diff-filter=A $BASE_SHA $HEAD_SHA` output for debugging: ---"
-            git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" || true # Display raw output for debugging
-            echo "DEBUG: --- Full `git diff-tree --no-commit-id --name-only --diff-filter=A $MERGE_COMMIT_SHA` output for debugging: ---"
-            git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" || true # Display raw output for debugging
             exit 1
           fi
 
