@@ -1,20 +1,21 @@
 name: Create Subdomain DNS Record on Cloudflare
 
 on:
-  pull_request_target:
+  pull_request:
     types: [closed]
     branches:
-      - main
+      - main # Only run if the PR was merged into the 'main' branch
 
 jobs:
   create-dns:
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # Fetch the full history of both head and base for robust diffing
           fetch-depth: 0
 
       - name: Set up Python
@@ -25,62 +26,49 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Get Merged JSON File Path
+      - name: Get Merged JSON File Path (Enhanced Debugging)
         id: get_file_path
         run: |
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
           HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           MERGE_COMMIT_SHA="${{ github.event.pull_request.merge_commit_sha }}"
-          echo "Base SHA: $BASE_SHA"
-          echo "Head SHA: $HEAD_SHA"
-          echo "Merge Commit SHA: $MERGE_COMMIT_SHA"
+
+          echo "DEBUG: Base SHA: $BASE_SHA"
+          echo "DEBUG: Head SHA: $HEAD_SHA"
+          echo "DEBUG: Merge Commit SHA: $MERGE_COMMIT_SHA"
+
+          NEW_FILE=""
+
+          echo "DEBUG: Attempting to find added JSON file using git diff between base and head SHAs..."
+          # This command compares the state of the base branch before the PR to the head of the PR.
+          # It's often more reliable for finding files added *within* the PR's commits.
+          # --diff-filter=A looks for added files.
+          # We're adding the '^' anchor in grep to ensure it starts with 'domains/'
           NEW_FILE=$(git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" | grep '^domains/.*\.json$' | head -n 1)
+
           if [ -z "$NEW_FILE" ]; then
-            echo "No file found with primary method. Using fallback with merge commit SHA..."
-            NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
+            echo "DEBUG: No file found with git diff between base and head. Attempting fallback with merge commit..."
+            # Fallback to git diff-tree on the merge commit itself
+            if [ -n "$MERGE_COMMIT_SHA" ]; then
+                NEW_FILE=$(git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" | grep '^domains/.*\.json$' | head -n 1)
+            fi
           fi
+
           if [ -z "$NEW_FILE" ]; then
             echo "::error::No new JSON file found in 'domains/' directory for this PR merge."
+            echo "DEBUG: Checked with git diff ($BASE_SHA..$HEAD_SHA) and git diff-tree ($MERGE_COMMIT_SHA)."
+            echo "DEBUG: --- Full `git diff --name-only --diff-filter=A $BASE_SHA $HEAD_SHA` output for debugging: ---"
+            git diff --name-only --diff-filter=A "$BASE_SHA" "$HEAD_SHA" || true # Display raw output for debugging
+            echo "DEBUG: --- Full `git diff-tree --no-commit-id --name-only --diff-filter=A $MERGE_COMMIT_SHA` output for debugging: ---"
+            git diff-tree --no-commit-id --name-only --diff-filter=A "$MERGE_COMMIT_SHA" || true # Display raw output for debugging
             exit 1
           fi
+
           echo "NEW_FILE_PATH=$NEW_FILE" >> $GITHUB_OUTPUT
           echo "Discovered new file: $NEW_FILE"
 
-      # --- NEW DEBUG STEP ---
-      # This step checks for the secrets before attempting to use them.
-      - name: Debug - Verify Secret Availability
-        run: |
-          echo "--- Verifying Secret Availability ---"
-          IS_VALID=true
-
-          # Check if the API Token secret is present and not empty.
-          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN secret is NOT SET or is EMPTY."
-            IS_VALID=false
-          else
-            echo "✅ CLOUDFLARE_API_TOKEN secret is present."
-          fi
-
-          # Check if the Zone ID secret is present and not empty.
-          if [ -z "${{ secrets.CLOUDFLARE_ZONE_ID }}" ]; then
-            echo "::error::CLOUDFLARE_ZONE_ID secret is NOT SET or is EMPTY."
-            IS_VALID=false
-          else
-            echo "✅ CLOUDFLARE_ZONE_ID secret is present."
-          fi
-
-          # If either secret was invalid, fail the workflow.
-          if [ "$IS_VALID" = false ]; then
-            echo "----------------------------------------"
-            echo "::error::Failing workflow due to missing secrets. This is not a script error."
-            echo "::error::Please re-verify your repository secrets under 'Settings > Secrets and variables > Actions'. Ensure they are named correctly and have assigned values."
-            exit 1
-          fi
-
-          echo "--- Verification Succeeded. Secrets are available. ---"
-
       - name: Run DNS creation script
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLAREAPI }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLAREZONE }}
         run: python scripts/add_dns_record.py ${{ steps.get_file_path.outputs.NEW_FILE_PATH }}
