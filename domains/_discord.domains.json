@@ -1,0 +1,9 @@
+{
+    "owner": {
+        "username": "your-github-username",
+        "email": "contact@harys.is-a.dev"
+    },
+    "records": {
+        "TXT": "dh=b31484296b0f0acbbe5303193f26c181a9a4ea1b"
+    }
+}
