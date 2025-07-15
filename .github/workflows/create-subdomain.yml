@@ -1,10 +1,9 @@
 name: Create Subdomain DNS Record on Cloudflare
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
-      - main # Only run if the PR was merged into the 'main' branch
+      - main
 
 jobs:
   create-dns:
