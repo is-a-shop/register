@@ -1,0 +1,9 @@
+{
+  "subdomain": "maxvel187",
+  "target": "vc-domain-verify=maxvel187.is-a.shop,a99a8018c5216a070948",
+  "record_type": "TXT",
+  "owner": {
+    "github_username": "MAXVEL187",
+    "email": "m@05050101.xyz"
+  }
+}
