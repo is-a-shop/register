@@ -1,0 +1,10 @@
+{
+  "subdomain": "bingo",
+  "target": "centraler.github.io",
+  "record_type": "CNAME",
+  "description": "This is my first attempt to mainly share some of my interesting explorations",
+  "owner": {
+    "github_username": "centraler",
+    "email": "sksrpk12306@gmail.com"
+  }
+}
