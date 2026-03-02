@@ -1,1 +1,11 @@
 
+{
+  "subdomain": "linuxdo",
+  "record_type": "CNAME",
+  "target": "cname.vercel-dns.com",
+  "description": "LinuxDo community temporary placeholder",
+  "owner": {
+    "github_username": "okimilo",
+    "email": "okimilo@example.com"
+  }
+}
