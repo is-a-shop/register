@@ -12,7 +12,12 @@ Follow these steps to request your own subdomain:
 
 - Get your subdomain directly from [is-a.shop](https://is-a.shop/)
 
-  
+-----
+
+# Give a Star
+
+If you find this project useful, please give it a star on GitHub. It helps us spread the word and attract more users.
+
 -----
 
 ## Need Help?
