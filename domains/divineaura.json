@@ -1,0 +1,12 @@
+{
+  "description": "Divine Aura Shop",
+  "domain": "is-a.shop",
+  "subdomain": "divineaura",
+  "owner": {
+    "repo": "https://github.com/divineaura32/shop",
+    "email": "info@mamtachawla.com"
+  },
+  "record": {
+    "CNAME": "divineaura.github.io"
+  }
+}
