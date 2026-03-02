@@ -1,0 +1,10 @@
+{
+    "subdomain": "no",
+    "target": "haogege.github.io",
+    "record_type": "CNAME",
+    "description": "My awesome shop hosted on GitHub Pages.",
+    "owner": {
+        "github_username": "haogege",
+        "email": "kttde@hotmail.com"
+    }
+}
