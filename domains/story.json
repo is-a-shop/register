@@ -1,0 +1,10 @@
+{
+    "subdomain": "story",
+    "target": "salla.sa/pk.2",
+    "record_type": "CNAME",
+    "description": "Online shop on Salla platform.",
+    "owner": {
+        "github_username": "alshekbahaa",
+        "email": "alshekbahaa@github.com"
+    }
+}
