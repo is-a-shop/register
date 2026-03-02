@@ -1,6 +1,6 @@
 {
   "subdomain": "chejian",
-  "target": "jimizhou.com/chejian-redirect/",
+  "target": "JimiZhou.github.io",
   "record_type": "CNAME",
   "description": "Redirect page for chejian.",
   "owner": {
