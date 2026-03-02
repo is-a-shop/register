@@ -1,0 +1,9 @@
+{
+  "subdomain": "chejian",
+  "target": "jimizhou.com/chejian-redirect/",
+  "record_type": "CNAME",
+  "description": "Redirect page for chejian.",
+  "owner": {
+    "github_username": "JimiZhou"
+  }
+}
