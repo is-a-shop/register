@@ -1,0 +1,11 @@
+{
+  "domain": "rikaz",
+  "subdomain": "",
+  "owner": {
+    "username": "S20016327",
+    "email": ""
+  },
+  "record": {
+    "CNAME": "s20016327.github.io"
+  }
+}
